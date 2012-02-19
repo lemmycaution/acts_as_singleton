@@ -22,62 +22,44 @@ module ActiveRecord
     # This pattern matches methods that should be made private because they
     # should not be used in singleton classes.
     PRIVATE = \
-      /^all$|create(?!_reflection)|find(?!er)|firs|mini|max|new|d_sco|^upd/
+    /^all$|create(?!_reflection)|firs|mini|max|new|d_sco|^upd/
 
-    def self.included(model)
-      model.class_eval do
+    def self.included(base)
+      base.class_eval do
         private_class_method *methods.grep(PRIVATE) # Deny existent others.
+      end
 
-        class << self
-          def exists? # Refuse arguments.
-            super
-          end
+      base.send :extend, ClassMethods
+    end
 
-          # Returns the first (presumably only) record in the database, or
-          # creates one.
-          #
-          # If validation fails on creation, it will return an unsaved object.
-          #
-          #   HomepageSettings.instance.update_attributes :welcome => "Hello!"
-          def instance
-            first || create
-          end
+    def clone
+      raise TypeError, "can't clone instance of singleton #{self.class}"
+    end
 
-          def inspect
-            super.sub(/id: .+?, /) {} # Irrelevant.
-          end
+    def dup
+      raise TypeError, "can't dup instance of singleton #{self.class}"
+    end
 
-          def find(*)
-            unless caller.first.include?("lib/active_record")
-              raise NoMethodError,
-                "private method `find' called for #{inspect}"
-            end
-            super
-          end
+    def inspect
+      super.sub(/id: .+?, /) {} # Irrelevant.
+    end
 
-          def find_by_sql(*)
-            unless caller.first.include?("lib/active_record")
-              raise NoMethodError,
-                "private method `find_by_sql' called for #{inspect}"
-            end
-            super
-          end
-        end
+    module ClassMethods
+      def exists? # Refuse arguments.
+        super
+      end
 
-        def clone
-          raise TypeError, "can't clone instance of singleton #{self.class}"
-        end
+      def instance
+        @instance ||= first || new
+      end
 
-        def dup
-          raise TypeError, "can't dup instance of singleton #{self.class}"
-        end
-
-        def inspect
-          super.sub(/id: .+?, /) {} # Irrelevant.
-        end
+      def inspect
+        super.sub(/id: .+?, /) {} # Irrelevant.
       end
     end
+
   end
+
 
   class << Base
     # Class method to provide a more Rails-like experience. Merely includes
